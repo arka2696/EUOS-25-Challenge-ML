@@ -1,0 +1,5 @@
+task,threshold
+Fluorescence480,0.5
+Fluorescence340_450,0.5
+Transmittance450,0.5
+Transmittance340,0.5

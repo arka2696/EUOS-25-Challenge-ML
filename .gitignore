@@ -1,0 +1,25 @@
+# Singularity containers (large binary files)
+*.sif
+
+# Large NumPy data files
+outputs/X_train.npy
+outputs/X_test.npy
+outputs/oof_pred.npy
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# CatBoost training artifacts
+catboost_info/
+
+# Log files
+logs/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Large generated CSVs
+merged_train.csv
+cleaned_test.csv

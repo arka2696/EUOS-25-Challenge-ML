@@ -1,0 +1,64 @@
+Bootstrap: docker
+From: mambaorg/micromamba:1.5.10-jammy
+
+%labels
+  Author      LIVR-VUB / ImageD
+  Description EUOS25 (classical ML) — conda-forge only, NumPy<2, RDKit+SciPy+sklearn consistent
+  Version     1.0
+  Date        2025-12-29
+
+%environment
+  export LC_ALL=C.UTF-8
+  export LANG=C.UTF-8
+  export PYTHONUNBUFFERED=1
+
+  # Force micromamba root + env location (runtime)
+  export MAMBA_ROOT_PREFIX=/opt/micromamba
+  export EUOS25_ENV=/opt/micromamba/envs/euos25
+  export PATH="$EUOS25_ENV/bin:$PATH"
+
+%post
+  set -eux
+
+  # NOTE: %environment is NOT active during %post, so set root prefix here too.
+  export MAMBA_ROOT_PREFIX=/opt/micromamba
+  mkdir -p "$MAMBA_ROOT_PREFIX"
+
+  # Create conda-forge-only env at the desired prefix
+  micromamba create -y -r "$MAMBA_ROOT_PREFIX" -n euos25 -c conda-forge \
+    python=3.10 \
+    "numpy<2" "scipy<2" scikit-learn \
+    pandas matplotlib seaborn tqdm plotly \
+    rdkit \
+    xgboost lightgbm catboost \
+    graphviz
+
+  # Clean caches (micromamba clean does NOT take -r in 1.5.x)
+  micromamba clean -a -y
+
+  # Sanity checks (use micromamba run so prefix/env is guaranteed)
+  micromamba run -r "$MAMBA_ROOT_PREFIX" -n euos25 python -c \
+    "import numpy, scipy, sklearn; print('OK versions:', numpy.__version__, scipy.__version__, sklearn.__version__)"
+
+  micromamba run -r "$MAMBA_ROOT_PREFIX" -n euos25 python -c \
+    "from rdkit import Chem; assert Chem.MolFromSmiles('CCO') is not None; print('RDKit OK')"
+
+%runscript
+  # Always run inside the euos25 environment
+  exec /opt/micromamba/envs/euos25/bin/python "$@"
+
+%help
+  -------------------------------------------------------------------------
+  EUOS25 (Classical ML) container — stable conda-forge stack (NumPy<2)
+  -------------------------------------------------------------------------
+
+  Build:
+    apptainer build euos25_classical.sif euos25_classical.def
+
+  Quick test:
+    apptainer exec -B "$PWD":/work euos25_classical.sif -c \
+      "import numpy, scipy, sklearn; print('OK')"
+
+  Run your pipeline:
+    apptainer exec -B "$PWD":/work euos25_classical.sif /work/run_full_classical.py
+  -------------------------------------------------------------------------

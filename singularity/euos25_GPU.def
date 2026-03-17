@@ -1,0 +1,91 @@
+Bootstrap: docker
+From: nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+%labels
+  Author      LIVR-VUB / ImageD
+  Description EUOS25 (GNN) — PyTorch + PyG on CUDA, plus RDKit/Sklearn stack (NumPy<2)
+  Version     1.0
+  Date        2025-12-29
+
+%environment
+  export LC_ALL=C.UTF-8
+  export LANG=C.UTF-8
+  export DEBIAN_FRONTEND=noninteractive
+  export PYTHONUNBUFFERED=1
+  export VENV_PATH="/opt/euos25_gnn"
+  export PATH="$VENV_PATH/bin:$PATH"
+  export PYTHONNOUSERSITE=1
+
+%post
+  set -eux
+
+  # ---------------- Base system ----------------
+  apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 python3.10-venv python3.10-dev \
+    git wget curl ca-certificates \
+    build-essential pkg-config \
+    graphviz \
+    libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+  # ---------------- Python virtual env ----------------
+  python3.10 -m venv /opt/euos25_gnn
+  . /opt/euos25_gnn/bin/activate
+  pip install --upgrade pip setuptools wheel
+
+  # ---------------- Core numeric stack (pin NumPy<2) ----------------
+  # Install NumPy first to lock ABI, then SciPy/Sklearn
+  pip install "numpy==1.26.4"
+  pip install "scipy==1.15.3" "scikit-learn==1.7.2"
+
+  # ---------------- RDKit ----------------
+  # IMPORTANT: rdkit-pypi wheels are compiled; keep NumPy pinned.
+  pip install "rdkit-pypi==2022.9.5"
+
+  # ---------------- General utilities ----------------
+  pip install \
+    pandas==2.3.3 matplotlib==3.10.7 seaborn==0.13.2 tqdm==4.67.1 plotly==6.5.0
+
+  # ---------------- PyTorch (CUDA 12.4+) ----------------
+  # Use the official PyTorch CUDA wheel index.
+  # If your cluster blocks internet at build time, build elsewhere and copy .sif.
+  pip install --index-url https://download.pytorch.org/whl/cu124 \
+    torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1
+
+  # ---------------- PyTorch Geometric ----------------
+  # Install PyG + compiled deps matched to torch 2.5.1 + cu124
+  pip install pyg-lib torch-scatter torch-sparse torch-cluster torch-spline-conv \
+    -f https://data.pyg.org/whl/torch-2.5.1+cu124.html
+  pip install torch-geometric==2.6.1
+
+  # ---------------- Optional: (if you also want classical boosters here) ----------------
+  # Comment these out if you want the container minimal.
+  pip install xgboost==3.1.2 lightgbm==4.6.0 catboost==1.2.8
+
+  # ---------------- Sanity checks ----------------
+  python -c "import numpy as np; print('NumPy:', np.__version__)"
+  python -c "import scipy, sklearn; print('SciPy:', scipy.__version__, 'sklearn:', sklearn.__version__)"
+  python -c "from rdkit import Chem; assert Chem.MolFromSmiles('CCO') is not None; print('RDKit OK')"
+  python -c "import torch; print('Torch:', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
+  python -c "import torch_geometric; print('PyG:', torch_geometric.__version__)"
+
+%runscript
+  . /opt/euos25_gnn/bin/activate
+  exec "$@"
+
+%help
+  -------------------------------------------------------------------------
+  EUOS25 GNN Container (PyTorch + PyG)
+  -------------------------------------------------------------------------
+
+  Build:
+    apptainer build euos25_gnn.sif euos25_gnn.def
+
+  Run (GPU):
+    apptainer exec --nv -B "$PWD":/work euos25_gnn.sif \
+      python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+
+  Run your GNN script:
+    apptainer exec --nv -B "$PWD":/work euos25_gnn.sif \
+      python /work/your_gnn_runner.py
+  -------------------------------------------------------------------------
