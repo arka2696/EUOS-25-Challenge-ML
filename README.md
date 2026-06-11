@@ -176,7 +176,7 @@ python merge_csv.py
 
 This produces `merged_train.csv` (68,972 rows × 6 columns) and `cleaned_test.csv` (29,420 rows).
 
-### 3. Run the Pipeline
+### 3. Run the Pipeline  (Stepwise)
 
 **Locally:**
 
